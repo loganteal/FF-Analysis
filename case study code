@@ -1,0 +1,688 @@
+#Note this code was run in R3.5.1
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(ggplot2)
+library(grid)
+
+# Read in Data ------------------------------------------------------------
+setwd("//esas/SASDataFiles/Data Science/4_Teams/3_FtWorth/LoganTeal/2020/AdHoc/LN/")
+rev <- readxl::read_excel("//esas/SASDataFiles/Data Science/4_Teams/3_FtWorth/LoganTeal/2020/AdHoc/LN/2014 FraudFinder Case Study - Data Set.xlsx",
+                   sheet = "revenue")
+#Renaming product group 
+rev <- rev %>% rename(Product_Group = `Product Group`)
+
+#Reading in the transactional data
+usage2010 <- readxl::read_excel("//esas/SASDataFiles/Data Science/4_Teams/3_FtWorth/LoganTeal/2020/AdHoc/LN/2014 FraudFinder Case Study - Data Set.xlsx",
+                          sheet = "useage2010") %>% rename(Cust_ID = Customer,
+                                                           transact_2010 = `# Transactions`)
+usage2011 <- readxl::read_excel("//esas/SASDataFiles/Data Science/4_Teams/3_FtWorth/LoganTeal/2020/AdHoc/LN/2014 FraudFinder Case Study - Data Set.xlsx",
+                          sheet = "useage2011") %>% rename(Cust_ID = Customer,
+                                                           transact_2011 = `# Transactions`)
+usage2012 <- readxl::read_excel("//esas/SASDataFiles/Data Science/4_Teams/3_FtWorth/LoganTeal/2020/AdHoc/LN/2014 FraudFinder Case Study - Data Set.xlsx",
+                          sheet = "useage2012") %>% rename(Cust_ID = Customer,
+                                                           transact_2012 = `# Transactions`)
+#We have some duplicate rows in the usage dataframes - keeping just one
+usage2010 <- usage2010[!(duplicated(usage2010)),]
+usage2011 <- usage2011[!(duplicated(usage2011)),]
+usage2012 <- usage2012[!(duplicated(usage2012)),]
+
+# Overall Numbers Created -----------------------------------------------
+#If there was a negative value - they "refunded" the service.  I want to create an indicator if they did
+rev$refund_total <- apply(rev[,3:44], 1, min, na.rm=T)
+rev$refund_2010 <- apply(rev[,3:14], 1, min, na.rm=T)
+rev$refund_2011 <- apply(rev[,15:26], 1, min, na.rm=T)
+rev$refund_2012 <- apply(rev[,27:38], 1, min, na.rm=T)
+rev$refund_2013 <- apply(rev[,39:44], 1, min, na.rm=T)
+
+#Need to clean up those values incase the minimum isnt negative
+rev <- rev %>% mutate(refund_total = ifelse(refund_total < 0, refund_total, NA),
+                      refund_2010 = ifelse(refund_2010 < 0, refund_2010, NA),
+                      refund_2011 = ifelse(refund_2011 < 0, refund_2011, NA),
+                      refund_2012 = ifelse(refund_2012 < 0, refund_2012, NA),
+                      refund_2013 = ifelse(refund_2013 < 0, refund_2013, NA),
+                      #Create flags for having a refund
+                      refund_total_flag = ifelse(refund_total < 0, 1,0),
+                      refund_2010_flag = ifelse(refund_2010 < 0, 1,0),
+                      refund_2011_flag = ifelse(refund_2011 < 0, 1,0),
+                      refund_2012_flag = ifelse(refund_2012 < 0, 1,0),
+                      refund_2013_flag = ifelse(refund_2013 < 0, 1,0),
+                      
+                      Jan2010_refund = ifelse(Jan2010 < 0, 1,0),
+                      Feb2010_refund = ifelse(Feb2010 < 0, 1,0),
+                      Mar2010_refund = ifelse(Mar2010 < 0, 1,0),
+                      Apr2010_refund = ifelse(Apr2010 < 0, 1,0),
+                      May2010_refund = ifelse(May2010 < 0, 1,0),
+                      Jun2010_refund = ifelse(Jun2010 < 0, 1,0),
+                      Jul2010_refund = ifelse(Jul2010 < 0, 1,0),
+                      Aug2010_refund = ifelse(Aug2010 < 0, 1,0),
+                      Sep2010_refund = ifelse(Sep2010 < 0, 1,0),
+                      Oct2010_refund = ifelse(Oct2010 < 0, 1,0),
+                      Nov2010_refund = ifelse(Nov2010 < 0, 1,0),
+                      Dec2010_refund = ifelse(Dec2010 < 0, 1,0),
+                      Jan2011_refund = ifelse(Jan2011 < 0, 1,0),
+                      Feb2011_refund = ifelse(Feb2011 < 0, 1,0),
+                      Mar2011_refund = ifelse(Mar2011 < 0, 1,0),
+                      Apr2011_refund = ifelse(Apr2011 < 0, 1,0),
+                      May2011_refund = ifelse(May2011 < 0, 1,0),
+                      Jun2011_refund = ifelse(Jun2011 < 0, 1,0),
+                      Jul2011_refund = ifelse(Jul2011 < 0, 1,0),
+                      Aug2011_refund = ifelse(Aug2011 < 0, 1,0),
+                      Sep2011_refund = ifelse(Sep2011 < 0, 1,0),
+                      Oct2011_refund = ifelse(Oct2011 < 0, 1,0),
+                      Nov2011_refund = ifelse(Nov2011 < 0, 1,0),
+                      Dec2011_refund = ifelse(Dec2011 < 0, 1,0),
+                      Jan2012_refund = ifelse(Jan2012 < 0, 1,0),
+                      Feb2012_refund = ifelse(Feb2012 < 0, 1,0),
+                      Mar2012_refund = ifelse(Mar2012 < 0, 1,0),
+                      Apr2012_refund = ifelse(Apr2012 < 0, 1,0),
+                      May2012_refund = ifelse(May2012 < 0, 1,0),
+                      Jun2012_refund = ifelse(Jun2012 < 0, 1,0),
+                      Jul2012_refund = ifelse(Jul2012 < 0, 1,0),
+                      Aug2012_refund = ifelse(Aug2012 < 0, 1,0),
+                      Sep2012_refund = ifelse(Sep2012 < 0, 1,0),
+                      Oct2012_refund = ifelse(Oct2012 < 0, 1,0),
+                      Nov2012_refund = ifelse(Nov2012 < 0, 1,0),
+                      Dec2012_refund = ifelse(Dec2012 < 0, 1,0),
+                      Jan2013_refund = ifelse(Jan2013 < 0, 1,0),
+                      Feb2013_refund = ifelse(Feb2013 < 0, 1,0),
+                      Mar2013_refund = ifelse(Mar2013 < 0, 1,0),
+                      Apr2013_refund = ifelse(Apr2013 < 0, 1,0),
+                      May2013_refund = ifelse(May2013 < 0, 1,0),
+                      Jun2013_refund = ifelse(Jun2013 < 0, 1,0),
+                      
+                      Jan2010_customer = ifelse(Jan2010 > 0, 1,0),
+                      Feb2010_customer = ifelse(Feb2010 > 0, 1,0),
+                      Mar2010_customer = ifelse(Mar2010 > 0, 1,0),
+                      Apr2010_customer = ifelse(Apr2010 > 0, 1,0),
+                      May2010_customer = ifelse(May2010 > 0, 1,0),
+                      Jun2010_customer = ifelse(Jun2010 > 0, 1,0),
+                      Jul2010_customer = ifelse(Jul2010 > 0, 1,0),
+                      Aug2010_customer = ifelse(Aug2010 > 0, 1,0),
+                      Sep2010_customer = ifelse(Sep2010 > 0, 1,0),
+                      Oct2010_customer = ifelse(Oct2010 > 0, 1,0),
+                      Nov2010_customer = ifelse(Nov2010 > 0, 1,0),
+                      Dec2010_customer = ifelse(Dec2010 > 0, 1,0),
+                      Jan2011_customer = ifelse(Jan2011 > 0, 1,0),
+                      Feb2011_customer = ifelse(Feb2011 > 0, 1,0),
+                      Mar2011_customer = ifelse(Mar2011 > 0, 1,0),
+                      Apr2011_customer = ifelse(Apr2011 > 0, 1,0),
+                      May2011_customer = ifelse(May2011 > 0, 1,0),
+                      Jun2011_customer = ifelse(Jun2011 > 0, 1,0),
+                      Jul2011_customer = ifelse(Jul2011 > 0, 1,0),
+                      Aug2011_customer = ifelse(Aug2011 > 0, 1,0),
+                      Sep2011_customer = ifelse(Sep2011 > 0, 1,0),
+                      Oct2011_customer = ifelse(Oct2011 > 0, 1,0),
+                      Nov2011_customer = ifelse(Nov2011 > 0, 1,0),
+                      Dec2011_customer = ifelse(Dec2011 > 0, 1,0),
+                      Jan2012_customer = ifelse(Jan2012 > 0, 1,0),
+                      Feb2012_customer = ifelse(Feb2012 > 0, 1,0),
+                      Mar2012_customer = ifelse(Mar2012 > 0, 1,0),
+                      Apr2012_customer = ifelse(Apr2012 > 0, 1,0),
+                      May2012_customer = ifelse(May2012 > 0, 1,0),
+                      Jun2012_customer = ifelse(Jun2012 > 0, 1,0),
+                      Jul2012_customer = ifelse(Jul2012 > 0, 1,0),
+                      Aug2012_customer = ifelse(Aug2012 > 0, 1,0),
+                      Sep2012_customer = ifelse(Sep2012 > 0, 1,0),
+                      Oct2012_customer = ifelse(Oct2012 > 0, 1,0),
+                      Nov2012_customer = ifelse(Nov2012 > 0, 1,0),
+                      Dec2012_customer = ifelse(Dec2012 > 0, 1,0),
+                      Jan2013_customer = ifelse(Jan2013 > 0, 1,0),
+                      Feb2013_customer = ifelse(Feb2013 > 0, 1,0),
+                      Mar2013_customer = ifelse(Mar2013 > 0, 1,0),
+                      Apr2013_customer = ifelse(Apr2013 > 0, 1,0),
+                      May2013_customer = ifelse(May2013 > 0, 1,0),
+                      Jun2013_customer = ifelse(Jun2013 > 0, 1,0))
+
+#Create Revenue total variables
+rev <- rev %>% mutate(rev_total = rowSums(.[3:44]),
+                      rev_2010 = rowSums(.[3:14]),
+                      rev_2011 = rowSums(.[15:26]),
+                      rev_2012 = rowSums(.[27:38]),
+                      rev_2013 = rowSums(.[39:44]),
+                      #Creating indicator if they were a customer in each year - defined as having a positive revenue
+                      cust_2010 = ifelse(rev_2010 > 0, 1,0),
+                      cust_2011 = ifelse(rev_2011 > 0, 1,0),
+                      cust_2012 = ifelse(rev_2012 > 0, 1,0),
+                      cust_2013 = ifelse(rev_2013 > 0, 1,0))
+
+#Deciding to remove the other product_group since I am only evaluating the two FraudFinder models
+rev <- rev %>% filter(Product_Group != "Other")
+numbers <- rev %>% group_by(Product_Group) %>% summarise(Customers2010 = sum(cust_2010, na.rm = T),
+                                              Customers2011 = sum(cust_2011, na.rm = T),
+                                              Customers2012 = sum(cust_2012, na.rm = T),
+                                              Customers2013 = sum(cust_2013, na.rm = T),
+                                              ReturnCount2010 = sum(refund_2010_flag, na.rm = T),
+                                              ReturnCount2011 = sum(refund_2011_flag, na.rm = T),
+                                              ReturnCount2012 = sum(refund_2012_flag, na.rm = T),
+                                              ReturnCount2013 = sum(refund_2013_flag, na.rm = T),
+                                              Revenue2010 = sum(rev_2010, na.rm = T),
+                                              Revenue2011 = sum(rev_2011, na.rm = T),
+                                              Revenue2012 = sum(rev_2012, na.rm = T),
+                                              Revenue2013 = sum(rev_2013, na.rm = T),
+                                              Returns2010 = sum(refund_2010, na.rm = T),
+                                              Returns2011 = sum(refund_2011, na.rm = T),
+                                              Returns2012 = sum(refund_2012, na.rm = T),
+                                              Returns2013 = sum(refund_2013, na.rm = T),
+                                              Refunds_Total = sum(refund_total, na.rm = T),
+                                              Revenue_Total = sum(rev_total, na.rm = T),
+                                              
+                                              #Adding in Monthly Rev's to see seasonality
+                                              RevQ12010 = sum(Jan2010 + Feb2010 + Mar2010),
+                                              RevQ22010 = sum(Apr2010 + May2010 + Jun2010),
+                                              RevQ32010 = sum(Jul2010 + Aug2010 + Sep2010),
+                                              RevQ42010 = sum(Oct2010 + Nov2010 + Dec2010),
+                                              
+                                              RevQ12011 = sum(Jan2011 + Feb2011 + Mar2011),
+                                              RevQ22011 = sum(Apr2011 + May2011 + Jun2011),
+                                              RevQ32011 = sum(Jul2011 + Aug2011 + Sep2011),
+                                              RevQ42011 = sum(Oct2011 + Nov2011 + Dec2011),
+                                              
+                                              RevQ12012 = sum(Jan2012 + Feb2012 + Mar2012),
+                                              RevQ22012 = sum(Apr2012 + May2012 + Jun2012),
+                                              RevQ32012 = sum(Jul2012 + Aug2012 + Sep2012),
+                                              RevQ42012 = sum(Oct2012 + Nov2012 + Dec2012),
+                                              
+                                              RevQ12013 = sum(Jan2013 + Feb2013 + Mar2013),
+                                              RevQ22013 = sum(Apr2013 + May2013 + Jun2013),
+                                              
+                                              Jan2010_sum = sum(Jan2010, na.rm = T),
+                                              Feb2010_sum = sum(Feb2010, na.rm = T),
+                                              Mar2010_sum = sum(Mar2010, na.rm = T),
+                                              Apr2010_sum = sum(Apr2010, na.rm = T),
+                                              May2010_sum = sum(May2010, na.rm = T),
+                                              Jun2010_sum = sum(Jun2010, na.rm = T),
+                                              Jul2010_sum = sum(Jul2010, na.rm = T),
+                                              Aug2010_sum = sum(Aug2010, na.rm = T),
+                                              Sep2010_sum = sum(Sep2010, na.rm = T),
+                                              Oct2010_sum = sum(Oct2010, na.rm = T),
+                                              Nov2010_sum = sum(Nov2010, na.rm = T),
+                                              Dec2010_sum = sum(Dec2010, na.rm = T),
+                                              Jan2011_sum = sum(Jan2011, na.rm = T),
+                                              Feb2011_sum = sum(Feb2011, na.rm = T),
+                                              Mar2011_sum = sum(Mar2011, na.rm = T),
+                                              Apr2011_sum = sum(Apr2011, na.rm = T),
+                                              May2011_sum = sum(May2011, na.rm = T),
+                                              Jun2011_sum = sum(Jun2011, na.rm = T),
+                                              Jul2011_sum = sum(Jul2011, na.rm = T),
+                                              Aug2011_sum = sum(Aug2011, na.rm = T),
+                                              Sep2011_sum = sum(Sep2011, na.rm = T),
+                                              Oct2011_sum = sum(Oct2011, na.rm = T),
+                                              Nov2011_sum = sum(Nov2011, na.rm = T),
+                                              Dec2011_sum = sum(Dec2011, na.rm = T),
+                                              Jan2012_sum = sum(Jan2012, na.rm = T),
+                                              Feb2012_sum = sum(Feb2012, na.rm = T),
+                                              Mar2012_sum = sum(Mar2012, na.rm = T),
+                                              Apr2012_sum = sum(Apr2012, na.rm = T),
+                                              May2012_sum = sum(May2012, na.rm = T),
+                                              Jun2012_sum = sum(Jun2012, na.rm = T),
+                                              Jul2012_sum = sum(Jul2012, na.rm = T),
+                                              Aug2012_sum = sum(Aug2012, na.rm = T),
+                                              Sep2012_sum = sum(Sep2012, na.rm = T),
+                                              Oct2012_sum = sum(Oct2012, na.rm = T),
+                                              Nov2012_sum = sum(Nov2012, na.rm = T),
+                                              Dec2012_sum = sum(Dec2012, na.rm = T),
+                                              Jan2013_sum = sum(Jan2013, na.rm = T),
+                                              Feb2013_sum = sum(Feb2013, na.rm = T),
+                                              Mar2013_sum = sum(Mar2013, na.rm = T),
+                                              Apr2013_sum = sum(Apr2013, na.rm = T),
+                                              May2013_sum = sum(May2013, na.rm = T),
+                                              Jun2013_sum = sum(Jun2013, na.rm = T),
+                                              
+                                              Jan2010_refund_sum = sum(Jan2010_refund, na.rm = T),
+                                              Feb2010_refund_sum = sum(Feb2010_refund, na.rm = T),
+                                              Mar2010_refund_sum = sum(Mar2010_refund, na.rm = T),
+                                              Apr2010_refund_sum = sum(Apr2010_refund, na.rm = T),
+                                              May2010_refund_sum = sum(May2010_refund, na.rm = T),
+                                              Jun2010_refund_sum = sum(Jun2010_refund, na.rm = T),
+                                              Jul2010_refund_sum = sum(Jul2010_refund, na.rm = T),
+                                              Aug2010_refund_sum = sum(Aug2010_refund, na.rm = T),
+                                              Sep2010_refund_sum = sum(Sep2010_refund, na.rm = T),
+                                              Oct2010_refund_sum = sum(Oct2010_refund, na.rm = T),
+                                              Nov2010_refund_sum = sum(Nov2010_refund, na.rm = T),
+                                              Dec2010_refund_sum = sum(Dec2010_refund, na.rm = T),
+                                              Jan2011_refund_sum = sum(Jan2011_refund, na.rm = T),
+                                              Feb2011_refund_sum = sum(Feb2011_refund, na.rm = T),
+                                              Mar2011_refund_sum = sum(Mar2011_refund, na.rm = T),
+                                              Apr2011_refund_sum = sum(Apr2011_refund, na.rm = T),
+                                              May2011_refund_sum = sum(May2011_refund, na.rm = T),
+                                              Jun2011_refund_sum = sum(Jun2011_refund, na.rm = T),
+                                              Jul2011_refund_sum = sum(Jul2011_refund, na.rm = T),
+                                              Aug2011_refund_sum = sum(Aug2011_refund, na.rm = T),
+                                              Sep2011_refund_sum = sum(Sep2011_refund, na.rm = T),
+                                              Oct2011_refund_sum = sum(Oct2011_refund, na.rm = T),
+                                              Nov2011_refund_sum = sum(Nov2011_refund, na.rm = T),
+                                              Dec2011_refund_sum = sum(Dec2011_refund, na.rm = T),
+                                              Jan2012_refund_sum = sum(Jan2012_refund, na.rm = T),
+                                              Feb2012_refund_sum = sum(Feb2012_refund, na.rm = T),
+                                              Mar2012_refund_sum = sum(Mar2012_refund, na.rm = T),
+                                              Apr2012_refund_sum = sum(Apr2012_refund, na.rm = T),
+                                              May2012_refund_sum = sum(May2012_refund, na.rm = T),
+                                              Jun2012_refund_sum = sum(Jun2012_refund, na.rm = T),
+                                              Jul2012_refund_sum = sum(Jul2012_refund, na.rm = T),
+                                              Aug2012_refund_sum = sum(Aug2012_refund, na.rm = T),
+                                              Sep2012_refund_sum = sum(Sep2012_refund, na.rm = T),
+                                              Oct2012_refund_sum = sum(Oct2012_refund, na.rm = T),
+                                              Nov2012_refund_sum = sum(Nov2012_refund, na.rm = T),
+                                              Dec2012_refund_sum = sum(Dec2012_refund, na.rm = T),
+                                              Jan2013_refund_sum = sum(Jan2013_refund, na.rm = T),
+                                              Feb2013_refund_sum = sum(Feb2013_refund, na.rm = T),
+                                              Mar2013_refund_sum = sum(Mar2013_refund, na.rm = T),
+                                              Apr2013_refund_sum = sum(Apr2013_refund, na.rm = T),
+                                              May2013_refund_sum = sum(May2013_refund, na.rm = T),
+                                              Jun2013_refund_sum = sum(Jun2013_refund, na.rm = T),
+                                              
+                                              Jan2010_customer_sum = sum(Jan2010_customer, na.rm = T),
+                                              Feb2010_customer_sum = sum(Feb2010_customer, na.rm = T),
+                                              Mar2010_customer_sum = sum(Mar2010_customer, na.rm = T),
+                                              Apr2010_customer_sum = sum(Apr2010_customer, na.rm = T),
+                                              May2010_customer_sum = sum(May2010_customer, na.rm = T),
+                                              Jun2010_customer_sum = sum(Jun2010_customer, na.rm = T),
+                                              Jul2010_customer_sum = sum(Jul2010_customer, na.rm = T),
+                                              Aug2010_customer_sum = sum(Aug2010_customer, na.rm = T),
+                                              Sep2010_customer_sum = sum(Sep2010_customer, na.rm = T),
+                                              Oct2010_customer_sum = sum(Oct2010_customer, na.rm = T),
+                                              Nov2010_customer_sum = sum(Nov2010_customer, na.rm = T),
+                                              Dec2010_customer_sum = sum(Dec2010_customer, na.rm = T),
+                                              Jan2011_customer_sum = sum(Jan2011_customer, na.rm = T),
+                                              Feb2011_customer_sum = sum(Feb2011_customer, na.rm = T),
+                                              Mar2011_customer_sum = sum(Mar2011_customer, na.rm = T),
+                                              Apr2011_customer_sum = sum(Apr2011_customer, na.rm = T),
+                                              May2011_customer_sum = sum(May2011_customer, na.rm = T),
+                                              Jun2011_customer_sum = sum(Jun2011_customer, na.rm = T),
+                                              Jul2011_customer_sum = sum(Jul2011_customer, na.rm = T),
+                                              Aug2011_customer_sum = sum(Aug2011_customer, na.rm = T),
+                                              Sep2011_customer_sum = sum(Sep2011_customer, na.rm = T),
+                                              Oct2011_customer_sum = sum(Oct2011_customer, na.rm = T),
+                                              Nov2011_customer_sum = sum(Nov2011_customer, na.rm = T),
+                                              Dec2011_customer_sum = sum(Dec2011_customer, na.rm = T),
+                                              Jan2012_customer_sum = sum(Jan2012_customer, na.rm = T),
+                                              Feb2012_customer_sum = sum(Feb2012_customer, na.rm = T),
+                                              Mar2012_customer_sum = sum(Mar2012_customer, na.rm = T),
+                                              Apr2012_customer_sum = sum(Apr2012_customer, na.rm = T),
+                                              May2012_customer_sum = sum(May2012_customer, na.rm = T),
+                                              Jun2012_customer_sum = sum(Jun2012_customer, na.rm = T),
+                                              Jul2012_customer_sum = sum(Jul2012_customer, na.rm = T),
+                                              Aug2012_customer_sum = sum(Aug2012_customer, na.rm = T),
+                                              Sep2012_customer_sum = sum(Sep2012_customer, na.rm = T),
+                                              Oct2012_customer_sum = sum(Oct2012_customer, na.rm = T),
+                                              Nov2012_customer_sum = sum(Nov2012_customer, na.rm = T),
+                                              Dec2012_customer_sum = sum(Dec2012_customer, na.rm = T),
+                                              Jan2013_customer_sum = sum(Jan2013_customer, na.rm = T),
+                                              Feb2013_customer_sum = sum(Feb2013_customer, na.rm = T),
+                                              Mar2013_customer_sum = sum(Mar2013_customer, na.rm = T),
+                                              Apr2013_customer_sum = sum(Apr2013_customer, na.rm = T),
+                                              May2013_customer_sum = sum(May2013_customer, na.rm = T),
+                                              Jun2013_customer_sum = sum(Jun2013_customer, na.rm = T))
+#write.csv(numbers, "numbers.csv")
+#Going to build plots some in Excel with that CSV
+
+# Conversion Switches -----------------------------------------------------
+#Going to find the Switchers
+# First reset all negatives to 0.
+rev1 <- rev %>% mutate(Jan2010 = ifelse(Jan2010 <= 0, NA,Jan2010),
+                          Feb2010 = ifelse(Feb2010 <= 0, NA,Feb2010),
+                          Mar2010 = ifelse(Mar2010 <= 0, NA,Mar2010),
+                          Apr2010 = ifelse(Apr2010 <= 0, NA,Apr2010),
+                          May2010 = ifelse(May2010 <= 0, NA,May2010),
+                          Jun2010 = ifelse(Jun2010 <= 0, NA,Jun2010),
+                          Jul2010 = ifelse(Jul2010 <= 0, NA,Jul2010),
+                          Aug2010 = ifelse(Aug2010 <= 0, NA,Aug2010),
+                          Sep2010 = ifelse(Sep2010 <= 0, NA,Sep2010),
+                          Oct2010 = ifelse(Oct2010 <= 0, NA,Oct2010),
+                          Nov2010 = ifelse(Nov2010 <= 0, NA,Nov2010),
+                          Dec2010 = ifelse(Dec2010 <= 0, NA,Dec2010),
+                          Jan2011 = ifelse(Jan2011 <= 0, NA,Jan2011),
+                          Feb2011 = ifelse(Feb2011 <= 0, NA,Feb2011),
+                          Mar2011 = ifelse(Mar2011 <= 0, NA,Mar2011),
+                          Apr2011 = ifelse(Apr2011 <= 0, NA,Apr2011),
+                          May2011 = ifelse(May2011 <= 0, NA,May2011),
+                          Jun2011 = ifelse(Jun2011 <= 0, NA,Jun2011),
+                          Jul2011 = ifelse(Jul2011 <= 0, NA,Jul2011),
+                          Aug2011 = ifelse(Aug2011 <= 0, NA,Aug2011),
+                          Sep2011 = ifelse(Sep2011 <= 0, NA,Sep2011),
+                          Oct2011 = ifelse(Oct2011 <= 0, NA,Oct2011),
+                          Nov2011 = ifelse(Nov2011 <= 0, NA,Nov2011),
+                          Dec2011 = ifelse(Dec2011 <= 0, NA,Dec2011),
+                          Jan2012 = ifelse(Jan2012 <= 0, NA,Jan2012),
+                          Feb2012 = ifelse(Feb2012 <= 0, NA,Feb2012),
+                          Mar2012 = ifelse(Mar2012 <= 0, NA,Mar2012),
+                          Apr2012 = ifelse(Apr2012 <= 0, NA,Apr2012),
+                          May2012 = ifelse(May2012 <= 0, NA,May2012),
+                          Jun2012 = ifelse(Jun2012 <= 0, NA,Jun2012),
+                          Jul2012 = ifelse(Jul2012 <= 0, NA,Jul2012),
+                          Aug2012 = ifelse(Aug2012 <= 0, NA,Aug2012),
+                          Sep2012 = ifelse(Sep2012 <= 0, NA,Sep2012),
+                          Oct2012 = ifelse(Oct2012 <= 0, NA,Oct2012),
+                          Nov2012 = ifelse(Nov2012 <= 0, NA,Nov2012),
+                          Dec2012 = ifelse(Dec2012 <= 0, NA,Dec2012),
+                          Jan2013 = ifelse(Jan2013 <= 0, NA,Jan2013),
+                          Feb2013 = ifelse(Feb2013 <= 0, NA,Feb2013),
+                          Mar2013 = ifelse(Mar2013 <= 0, NA,Mar2013),
+                          Apr2013 = ifelse(Apr2013 <= 0, NA,Apr2013),
+                          May2013 = ifelse(May2013 <= 0, NA,May2013),
+                          Jun2013 = ifelse(Jun2013 <= 0, NA,Jun2013))
+
+# I need to get it on a 1 customer per row basis.  Here I am seperating out FF from FF2.0 customers
+#   and creating specific variables for each product to figure out when exactly they switched and what the value was
+rev_fraud <-rev1 %>% filter(Product_Group == "FraudFinder") %>% select(Cust_ID:Jun2013)
+rev_fraud2 <- rev1 %>% filter(Product_Group == "FraudFinder 2.0.") %>% select(Cust_ID:Jun2013)
+
+names(rev_fraud) <- paste0("f1_", names(rev_fraud))
+rev_fraud <- rev_fraud %>% rename(Cust_ID = f1_Cust_ID, Product_Group1 = f1_Product_Group)
+
+names(rev_fraud2) <- paste0("f2_", names(rev_fraud2))
+rev_fraud2 <- rev_fraud2 %>% rename(Cust_ID = f2_Cust_ID, Product_Group2 = f2_Product_Group)
+
+base <- unique(rev$Cust_ID) %>% as.data.frame()
+names(base) <- c("Cust_ID")
+base <- base %>% left_join(rev_fraud) %>% left_join(rev_fraud2)
+#Find the MaxFF - i need this to say they were actually a FF customer, and here is their value
+base$maxff <- apply(base[3:44], 1, max, na.rm = T)
+base1 <- base %>% mutate(Jan2010_switch = 0,
+                        Feb2010_switch = ifelse(f1_Jan2010 > 0 & is.na(f1_Feb2010) & f2_Feb2010 > 0 & maxff > 0, 1, 0),
+                        Mar2010_switch = ifelse(f1_Feb2010 > 0 & is.na(f1_Mar2010) & f2_Mar2010 > 0 & maxff > 0, 1, 0),
+                        Apr2010_switch = ifelse(f1_Mar2010 > 0 & is.na(f1_Apr2010) & f2_Apr2010 > 0 & maxff > 0, 1, 0),
+                        May2010_switch = ifelse(f1_Apr2010 > 0 & is.na(f1_May2010) & f2_May2010 > 0 & maxff > 0, 1, 0),
+                        Jun2010_switch = ifelse(f1_May2010 > 0 & is.na(f1_Jun2010) & f2_Jun2010 > 0 & maxff > 0, 1, 0),
+                        Jul2010_switch = ifelse(f1_Jun2010 > 0 & is.na(f1_Jul2010) & f2_Jul2010 > 0 & maxff > 0, 1, 0),
+                        Aug2010_switch = ifelse(f1_Jul2010 > 0 & is.na(f1_Aug2010) & f2_Aug2010 > 0 & maxff > 0, 1, 0),
+                        Sep2010_switch = ifelse(f1_Aug2010 > 0 & is.na(f1_Sep2010) & f2_Sep2010 > 0 & maxff > 0, 1, 0),
+                        Oct2010_switch = ifelse(f1_Sep2010 > 0 & is.na(f1_Oct2010) & f2_Oct2010 > 0 & maxff > 0, 1, 0),
+                        Nov2010_switch = ifelse(f1_Oct2010 > 0 & is.na(f1_Nov2010) & f2_Nov2010 > 0 & maxff > 0, 1, 0),
+                        Dec2010_switch = ifelse(f1_Nov2010 > 0 & is.na(f1_Dec2010) & f2_Dec2010 > 0 & maxff > 0, 1, 0),
+                        Jan2011_switch = ifelse(f1_Dec2010 > 0 & is.na(f1_Jan2011) & f2_Jan2011 > 0 & maxff > 0, 1, 0),
+                        Feb2011_switch = ifelse(f1_Jan2011 > 0 & is.na(f1_Feb2011) & f2_Feb2011 > 0 & maxff > 0, 1, 0),
+                        Mar2011_switch = ifelse(f1_Feb2011 > 0 & is.na(f1_Mar2011) & f2_Mar2011 > 0 & maxff > 0, 1, 0),
+                        Apr2011_switch = ifelse(f1_Mar2011 > 0 & is.na(f1_Apr2011) & f2_Apr2011 > 0 & maxff > 0, 1, 0),
+                        May2011_switch = ifelse(f1_Apr2011 > 0 & is.na(f1_May2011) & f2_May2011 > 0 & maxff > 0, 1, 0),
+                        Jun2011_switch = ifelse(f1_May2011 > 0 & is.na(f1_Jun2011) & f2_Jun2011 > 0 & maxff > 0, 1, 0),
+                        Jul2011_switch = ifelse(f1_Jun2011 > 0 & is.na(f1_Jul2011) & f2_Jul2011 > 0 & maxff > 0, 1, 0),
+                        Aug2011_switch = ifelse(f1_Jul2011 > 0 & is.na(f1_Aug2011) & f2_Aug2011 > 0 & maxff > 0, 1, 0),
+                        Sep2011_switch = ifelse(f1_Aug2011 > 0 & is.na(f1_Sep2011) & f2_Sep2011 > 0 & maxff > 0, 1, 0),
+                        Oct2011_switch = ifelse(f1_Sep2011 > 0 & is.na(f1_Oct2011) & f2_Oct2011 > 0 & maxff > 0, 1, 0),
+                        Nov2011_switch = ifelse(f1_Oct2011 > 0 & is.na(f1_Nov2011) & f2_Nov2011 > 0 & maxff > 0, 1, 0),
+                        Dec2011_switch = ifelse(f1_Nov2011 > 0 & is.na(f1_Dec2011) & f2_Dec2011 > 0 & maxff > 0, 1, 0),
+                        Jan2012_switch = ifelse(f1_Dec2011 > 0 & is.na(f1_Jan2012) & f2_Jan2012 > 0 & maxff > 0, 1, 0),
+                        Feb2012_switch = ifelse(f1_Jan2012 > 0 & is.na(f1_Feb2012) & f2_Feb2012 > 0 & maxff > 0, 1, 0),
+                        Mar2012_switch = ifelse(f1_Feb2012 > 0 & is.na(f1_Mar2012) & f2_Mar2012 > 0 & maxff > 0, 1, 0),
+                        Apr2012_switch = ifelse(f1_Mar2012 > 0 & is.na(f1_Apr2012) & f2_Apr2012 > 0 & maxff > 0, 1, 0),
+                        May2012_switch = ifelse(f1_Apr2012 > 0 & is.na(f1_May2012) & f2_May2012 > 0 & maxff > 0, 1, 0),
+                        Jun2012_switch = ifelse(f1_May2012 > 0 & is.na(f1_Jun2012) & f2_Jun2012 > 0 & maxff > 0, 1, 0),
+                        Jul2012_switch = ifelse(f1_Jun2012 > 0 & is.na(f1_Jul2012) & f2_Jul2012 > 0 & maxff > 0, 1, 0),
+                        Aug2012_switch = ifelse(f1_Jul2012 > 0 & is.na(f1_Aug2012) & f2_Aug2012 > 0 & maxff > 0, 1, 0),
+                        Sep2012_switch = ifelse(f1_Aug2012 > 0 & is.na(f1_Sep2012) & f2_Sep2012 > 0 & maxff > 0, 1, 0),
+                        Oct2012_switch = ifelse(f1_Sep2012 > 0 & is.na(f1_Oct2012) & f2_Oct2012 > 0 & maxff > 0, 1, 0),
+                        Nov2012_switch = ifelse(f1_Oct2012 > 0 & is.na(f1_Nov2012) & f2_Nov2012 > 0 & maxff > 0, 1, 0),
+                        Dec2012_switch = ifelse(f1_Nov2012 > 0 & is.na(f1_Dec2012) & f2_Dec2012 > 0 & maxff > 0, 1, 0),
+                        Jan2013_switch = ifelse(f1_Dec2012 > 0 & is.na(f1_Jan2013) & f2_Jan2013 > 0 & maxff > 0, 1, 0),
+                        Feb2013_switch = ifelse(f1_Jan2013 > 0 & is.na(f1_Feb2013) & f2_Feb2013 > 0 & maxff > 0, 1, 0),
+                        Mar2013_switch = ifelse(f1_Feb2013 > 0 & is.na(f1_Mar2013) & f2_Mar2013 > 0 & maxff > 0, 1, 0),
+                        Apr2013_switch = ifelse(f1_Mar2013 > 0 & is.na(f1_Apr2013) & f2_Apr2013 > 0 & maxff > 0, 1, 0),
+                        May2013_switch = ifelse(f1_Apr2013 > 0 & is.na(f1_May2013) & f2_May2013 > 0 & maxff > 0, 1, 0),
+                        Jun2013_switch = ifelse(f1_May2013 > 0 & is.na(f1_Jun2013) & f2_Jun2013 > 0 & maxff > 0, 1, 0))
+
+#Bear with me here this if statement isn't pretty to look at.  But it essentially checks to see if you switch at time X, what was your FF price at time X - 1
+base2 <- base1 %>% mutate(end_f1_price = ifelse(Jan2010_switch == 1, f1_X,
+                                                ifelse(Feb2010_switch == 1, f1_Jan2010,
+                                                       ifelse(Mar2010_switch == 1, f1_Feb2010,
+                                                              ifelse(Apr2010_switch == 1, f1_Mar2010,
+                                                                     ifelse(May2010_switch == 1, f1_Apr2010,
+                                                                            ifelse(Jun2010_switch == 1, f1_May2010,
+                                                                                   ifelse(Jul2010_switch == 1, f1_Jun2010,
+                                                                                          ifelse(Aug2010_switch == 1, f1_Jul2010,
+                                                                                                 ifelse(Sep2010_switch == 1, f1_Aug2010,
+                                                                                                        ifelse(Oct2010_switch == 1, f1_Sep2010,
+                                                                                                               ifelse(Nov2010_switch == 1, f1_Oct2010,
+                                                                                                                      ifelse(Dec2010_switch == 1, f1_Nov2010,
+                                                                                                                             ifelse(Jan2011_switch == 1, f1_Dec2010,
+                                                                                                                                    ifelse(Feb2011_switch == 1, f1_Jan2011,
+                                                                                                                                           ifelse(Mar2011_switch == 1, f1_Feb2011,
+                                                                                                                                                  ifelse(Apr2011_switch == 1, f1_Mar2011,
+                                                                                                                                                         ifelse(May2011_switch == 1, f1_Apr2011,
+                                                                                                                                                                ifelse(Jun2011_switch == 1, f1_May2011,
+                                                                                                                                                                       ifelse(Jul2011_switch == 1, f1_Jun2011,
+                                                                                                                                                                              ifelse(Aug2011_switch == 1, f1_Jul2011,
+                                                                                                                                                                                     ifelse(Sep2011_switch == 1, f1_Aug2011,
+                                                                                                                                                                                            ifelse(Oct2011_switch == 1, f1_Sep2011,
+                                                                                                                                                                                                   ifelse(Nov2011_switch == 1, f1_Oct2011,
+                                                                                                                                                                                                          ifelse(Dec2011_switch == 1, f1_Nov2011,
+                                                                                                                                                                                                                 ifelse(Jan2012_switch == 1, f1_Dec2011,
+                                                                                                                                                                                                                        ifelse(Feb2012_switch == 1, f1_Jan2012,
+                                                                                                                                                                                                                               ifelse(Mar2012_switch == 1, f1_Feb2012,
+                                                                                                                                                                                                                                      ifelse(Apr2012_switch == 1, f1_Mar2012,
+                                                                                                                                                                                                                                             ifelse(May2012_switch == 1, f1_Apr2012,
+                                                                                                                                                                                                                                                    ifelse(Jun2012_switch == 1, f1_May2012,
+                                                                                                                                                                                                                                                           ifelse(Jul2012_switch == 1, f1_Jun2012,
+                                                                                                                                                                                                                                                                  ifelse(Aug2012_switch == 1, f1_Jul2012,
+                                                                                                                                                                                                                                                                         ifelse(Sep2012_switch == 1, f1_Aug2012,
+                                                                                                                                                                                                                                                                                ifelse(Oct2012_switch == 1, f1_Sep2012,
+                                                                                                                                                                                                                                                                                       ifelse(Nov2012_switch == 1, f1_Oct2012,
+                                                                                                                                                                                                                                                                                              ifelse(Dec2012_switch == 1, f1_Nov2012,
+                                                                                                                                                                                                                                                                                                     ifelse(Jan2013_switch == 1, f1_Dec2012,
+                                                                                                                                                                                                                                                                                                            ifelse(Feb2013_switch == 1, f1_Jan2013,
+                                                                                                                                                                                                                                                                                                                   ifelse(Mar2013_switch == 1, f1_Feb2013,
+                                                                                                                                                                                                                                                                                                                          ifelse(Apr2013_switch == 1, f1_Mar2013,
+                                                                                                                                                                                                                                                                                                                                 ifelse(May2013_switch == 1, f1_Apr2013,
+                                                                                                                                                                                                                                                                                                                                        ifelse(Jun2013_switch == 1, f1_May2013, NA)))))))))))))))))))))))))))))))))))))))))))
+#This looks if you switched at time X what your starting FF2.0 price was for Time X 
+base3 <- base2 %>% mutate(beg_f2_price = ifelse(Jan2010_switch == 1, f2_Jan2010,
+                                                ifelse(Feb2010_switch == 1, f2_Feb2010,
+                                                       ifelse(Mar2010_switch == 1, f2_Mar2010,
+                                                              ifelse(Apr2010_switch == 1, f2_Apr2010,
+                                                                     ifelse(May2010_switch == 1, f2_May2010,
+                                                                            ifelse(Jun2010_switch == 1, f2_Jun2010,
+                                                                                   ifelse(Jul2010_switch == 1, f2_Jul2010,
+                                                                                          ifelse(Aug2010_switch == 1, f2_Aug2010,
+                                                                                                 ifelse(Sep2010_switch == 1, f2_Sep2010,
+                                                                                                        ifelse(Oct2010_switch == 1, f2_Oct2010,
+                                                                                                               ifelse(Nov2010_switch == 1, f2_Nov2010,
+                                                                                                                      ifelse(Dec2010_switch == 1, f2_Dec2010,
+                                                                                                                             ifelse(Jan2011_switch == 1, f2_Jan2011,
+                                                                                                                                    ifelse(Feb2011_switch == 1, f2_Feb2011,
+                                                                                                                                           ifelse(Mar2011_switch == 1, f2_Mar2011,
+                                                                                                                                                  ifelse(Apr2011_switch == 1, f2_Apr2011,
+                                                                                                                                                         ifelse(May2011_switch == 1, f2_May2011,
+                                                                                                                                                                ifelse(Jun2011_switch == 1, f2_Jun2011,
+                                                                                                                                                                       ifelse(Jul2011_switch == 1, f2_Jul2011,
+                                                                                                                                                                              ifelse(Aug2011_switch == 1, f2_Aug2011,
+                                                                                                                                                                                     ifelse(Sep2011_switch == 1, f2_Sep2011,
+                                                                                                                                                                                            ifelse(Oct2011_switch == 1, f2_Oct2011,
+                                                                                                                                                                                                   ifelse(Nov2011_switch == 1, f2_Nov2011,
+                                                                                                                                                                                                          ifelse(Dec2011_switch == 1, f2_Dec2011,
+                                                                                                                                                                                                                 ifelse(Jan2012_switch == 1, f2_Jan2012,
+                                                                                                                                                                                                                        ifelse(Feb2012_switch == 1, f2_Feb2012,
+                                                                                                                                                                                                                               ifelse(Mar2012_switch == 1, f2_Mar2012,
+                                                                                                                                                                                                                                      ifelse(Apr2012_switch == 1, f2_Apr2012,
+                                                                                                                                                                                                                                             ifelse(May2012_switch == 1, f2_May2012,
+                                                                                                                                                                                                                                                    ifelse(Jun2012_switch == 1, f2_Jun2012,
+                                                                                                                                                                                                                                                           ifelse(Jul2012_switch == 1, f2_Jul2012,
+                                                                                                                                                                                                                                                                  ifelse(Aug2012_switch == 1, f2_Aug2012,
+                                                                                                                                                                                                                                                                         ifelse(Sep2012_switch == 1, f2_Sep2012,
+                                                                                                                                                                                                                                                                                ifelse(Oct2012_switch == 1, f2_Oct2012,
+                                                                                                                                                                                                                                                                                       ifelse(Nov2012_switch == 1, f2_Nov2012,
+                                                                                                                                                                                                                                                                                              ifelse(Dec2012_switch == 1, f2_Dec2012,
+                                                                                                                                                                                                                                                                                                     ifelse(Jan2013_switch == 1, f2_Jan2013,
+                                                                                                                                                                                                                                                                                                            ifelse(Feb2013_switch == 1, f2_Feb2013,
+                                                                                                                                                                                                                                                                                                                   ifelse(Mar2013_switch == 1, f2_Mar2013,
+                                                                                                                                                                                                                                                                                                                          ifelse(Apr2013_switch == 1, f2_Apr2013,
+                                                                                                                                                                                                                                                                                                                                 ifelse(May2013_switch == 1, f2_May2013,
+                                                                                                                                                                                                                                                                                                                                        ifelse(Jun2013_switch == 1, f2_Jun2013, NA)))))))))))))))))))))))))))))))))))))))))))
+#Since i removed the negative values to create the variables above, going to just grab those and join back to the real rev numbers
+rev_f <-rev %>% filter(Product_Group == "FraudFinder") %>% select(Cust_ID:Jun2013)
+rev_f2 <- rev %>% filter(Product_Group == "FraudFinder 2.0.") %>% select(Cust_ID:Jun2013)
+
+names(rev_f) <- paste0("f1_", names(rev_f))
+rev_f <- rev_f %>% rename(Cust_ID = f1_Cust_ID, Product_Group1 = f1_Product_Group)
+
+names(rev_f2) <- paste0("f2_", names(rev_f2))
+rev_f2 <- rev_f2 %>% rename(Cust_ID = f2_Cust_ID, Product_Group2 = f2_Product_Group)
+
+base_final <- unique(rev$Cust_ID) %>% as.data.frame()
+names(base_final) <- c("Cust_ID")
+base_final <- base_final %>% left_join(rev_f) %>% left_join(rev_f2)
+
+#Grab created variables
+base3_vars <- base3 %>% select(Cust_ID, Jan2010_switch:beg_f2_price)
+base_final <- base_final %>% left_join(base3_vars)
+
+switchers <- base_final %>% filter(!is.na(beg_f2_price))
+switchers$increase <- switchers$beg_f2_price - switchers$end_f1_price
+switchers$pct_increase <- (switchers$beg_f2_price-switchers$end_f1_price)/switchers$end_f1_price
+(sum(switchers$beg_f2_price) - sum(switchers$end_f1_price) )/ sum(switchers$end_f1_price)
+mean(switchers$pct_increase)
+
+#Some observations had a price of like a penny, so their percentage increase was throwing off the mean.
+change_high <- switchers %>% filter(end_f1_price >= 50)
+(sum(change_high$beg_f2_price) - sum(change_high$end_f1_price) )/ sum(change_high$end_f1_price)
+mean(change_high$pct_increase)
+
+mean(change_high$end_f1_price)
+mean(change_high$beg_f2_price)
+
+# Revenue numbers
+base_final <- base_final %>% select(-Product_Group2, Product_Group2)
+#Double checking my revenue numbers from before I got it on 1 customer per row basis.  They match at 50,384,927
+base_final <- base_final %>% mutate(rev_total = rowSums(.[3:86], na.rm = T))
+sum(base_final$rev_total, na.rm = T)
+
+
+# What % of F2 is New/Switch? ---------------------------------------------
+#New accounts wont have NA for product_group1,  get yearly totals
+base_final <- base_final %>% mutate(ff2_rev_2010 = rowSums(.[45:56], na.rm = T),
+                                    ff2_rev_2011 = rowSums(.[57:68], na.rm = T),
+                                    ff2_rev_2012 = rowSums(.[69:80], na.rm = T),
+                                    ff2_rev_2013 = rowSums(.[81:86], na.rm = T))
+base_final %>% group_by(Product_Group1) %>% summarise(ff2_rev_2010_t = sum(ff2_rev_2010, na.rm = T),
+                                                      ff2_rev_2011_t = sum(ff2_rev_2011, na.rm = T),
+                                                      ff2_rev_2012_t = sum(ff2_rev_2012, na.rm = T),
+                                                      ff2_rev_2013_t = sum(ff2_rev_2013, na.rm = T))
+
+
+#Switch rates
+base_final <- base_final %>% mutate(switched = ifelse(end_f1_price > 0, 1, 0),
+                                    switched = ifelse(is.na(switched), 0, switched))
+base_final %>% group_by(switched) %>% summarise(count = n(),
+                                                rev = sum(rev_total))
+
+#I do want to figure out how often people are switching over - in order to know when that source will run out
+switch <- base_final %>% summarise(Jan2010_switch_sum = sum(Jan2010_switch, na.rm = T),
+                         Feb2010_switch_sum = sum(Feb2010_switch, na.rm = T),
+                         Mar2010_switch_sum = sum(Mar2010_switch, na.rm = T),
+                         Apr2010_switch_sum = sum(Apr2010_switch, na.rm = T),
+                         May2010_switch_sum = sum(May2010_switch, na.rm = T),
+                         Jun2010_switch_sum = sum(Jun2010_switch, na.rm = T),
+                         Jul2010_switch_sum = sum(Jul2010_switch, na.rm = T),
+                         Aug2010_switch_sum = sum(Aug2010_switch, na.rm = T),
+                         Sep2010_switch_sum = sum(Sep2010_switch, na.rm = T),
+                         Oct2010_switch_sum = sum(Oct2010_switch, na.rm = T),
+                         Nov2010_switch_sum = sum(Nov2010_switch, na.rm = T),
+                         Dec2010_switch_sum = sum(Dec2010_switch, na.rm = T),
+                         Jan2011_switch_sum = sum(Jan2011_switch, na.rm = T),
+                         Feb2011_switch_sum = sum(Feb2011_switch, na.rm = T),
+                         Mar2011_switch_sum = sum(Mar2011_switch, na.rm = T),
+                         Apr2011_switch_sum = sum(Apr2011_switch, na.rm = T),
+                         May2011_switch_sum = sum(May2011_switch, na.rm = T),
+                         Jun2011_switch_sum = sum(Jun2011_switch, na.rm = T),
+                         Jul2011_switch_sum = sum(Jul2011_switch, na.rm = T),
+                         Aug2011_switch_sum = sum(Aug2011_switch, na.rm = T),
+                         Sep2011_switch_sum = sum(Sep2011_switch, na.rm = T),
+                         Oct2011_switch_sum = sum(Oct2011_switch, na.rm = T),
+                         Nov2011_switch_sum = sum(Nov2011_switch, na.rm = T),
+                         Dec2011_switch_sum = sum(Dec2011_switch, na.rm = T),
+                         Jan2012_switch_sum = sum(Jan2012_switch, na.rm = T),
+                         Feb2012_switch_sum = sum(Feb2012_switch, na.rm = T),
+                         Mar2012_switch_sum = sum(Mar2012_switch, na.rm = T),
+                         Apr2012_switch_sum = sum(Apr2012_switch, na.rm = T),
+                         May2012_switch_sum = sum(May2012_switch, na.rm = T),
+                         Jun2012_switch_sum = sum(Jun2012_switch, na.rm = T),
+                         Jul2012_switch_sum = sum(Jul2012_switch, na.rm = T),
+                         Aug2012_switch_sum = sum(Aug2012_switch, na.rm = T),
+                         Sep2012_switch_sum = sum(Sep2012_switch, na.rm = T),
+                         Oct2012_switch_sum = sum(Oct2012_switch, na.rm = T),
+                         Nov2012_switch_sum = sum(Nov2012_switch, na.rm = T),
+                         Dec2012_switch_sum = sum(Dec2012_switch, na.rm = T),
+                         Jan2013_switch_sum = sum(Jan2013_switch, na.rm = T),
+                         Feb2013_switch_sum = sum(Feb2013_switch, na.rm = T),
+                         Mar2013_switch_sum = sum(Mar2013_switch, na.rm = T),
+                         Apr2013_switch_sum = sum(Apr2013_switch, na.rm = T),
+                         May2013_switch_sum = sum(May2013_switch, na.rm = T),
+                         Jun2013_switch_sum = sum(Jun2013_switch, na.rm = T)) %>% t() %>% as.data.frame()
+
+# Transactions vs Revenue Charts ------------------------------------------
+df <- rev %>% select(Cust_ID, Product_Group, cust_2010, cust_2011, cust_2012, rev_2010, rev_2011, rev_2012)
+df_1 <- df %>% filter(Product_Group == "FraudFinder")
+df_2 <- df %>% filter(Product_Group == "FraudFinder 2.0.")
+names(df_1) <- c("Cust_ID", "Product_Group1", 'ff1_cust_2010', 'ff1_cust_2011', 'ff1_cust_2012', 'ff1_rev_2010', 'ff1_rev_2011', 'ff1_rev_2012')
+names(df_2) <- c("Cust_ID", "Product_Group2", 'ff2_cust_2010', 'ff2_cust_2011','ff2_cust_2012', 'ff2_rev_2010', 'ff2_rev_2011', 'ff2_rev_2012')
+
+df <- df %>% select(Cust_ID) %>% left_join(df_1) %>% left_join(df_2) %>% left_join(usage2010) %>% left_join(usage2011) %>% left_join(usage2012)
+df_tran <- df %>% filter(Cust_ID %in% c(usage2010$Cust_ID, usage2011$Cust_ID, usage2012$Cust_ID))
+
+#Transaction must be for both products, so create a final Rev year to compare
+
+df_tran <- df_tran %>% mutate(ff1_rev_2010 = ifelse(is.na(ff1_rev_2010), 0, ff1_rev_2010),
+                              ff1_rev_2011 = ifelse(is.na(ff1_rev_2011), 0, ff1_rev_2011),
+                              ff1_rev_2012 = ifelse(is.na(ff1_rev_2012), 0, ff1_rev_2012),
+                              ff2_rev_2010 = ifelse(is.na(ff2_rev_2010), 0, ff2_rev_2010),
+                              ff2_rev_2011 = ifelse(is.na(ff2_rev_2011), 0, ff2_rev_2011),
+                              ff2_rev_2012 = ifelse(is.na(ff2_rev_2012), 0, ff2_rev_2012),
+                              rev_2010 = ff1_rev_2010 + ff2_rev_2010,
+                              rev_2011 = ff1_rev_2011 + ff2_rev_2011,
+                              rev_2012 = ff1_rev_2012 + ff2_rev_2012)
+
+
+
+ggplot(df_tran) + geom_point(aes(transact_2010, rev_2010)) + xlim(0,quantile(df_tran$transact_2010, .99, na.rm = T)) + ylim(0, quantile(df_tran$rev_2010, .99, na.rm = T))
+ggplot(df_tran) + geom_point(aes(transact_2011, rev_2011)) + xlim(0,quantile(df_tran$transact_2011, .99, na.rm = T)) + ylim(0, quantile(df_tran$rev_2011, .99, na.rm = T))
+ggplot(df_tran) + geom_point(aes(transact_2012, rev_2012)) + xlim(0,quantile(df_tran$transact_2012, .99, na.rm = T)) + ylim(0, quantile(df_tran$rev_2012, .99, na.rm = T))
+
+df_tran_2010 <- df_tran %>% filter(!is.na(transact_2010), 
+                                   rev_2010 != 0,
+                                   transact_2010 != 0)
+df_tran_2010_clean <- df_tran_2010 %>% filter(transact_2010 < quantile(df_tran_2010$transact_2010, .75) + 1.5*stats::IQR(df_tran_2010$transact_2010),
+                                              transact_2010 > quantile(df_tran_2010$transact_2010, .25) - 1.5*stats::IQR(df_tran_2010$transact_2010))
+
+df_tran_2011 <- df_tran %>% filter(!is.na(transact_2011), 
+                                   rev_2011 != 0,
+                                   transact_2011 != 0)
+df_tran_2011_clean <- df_tran_2011 %>% filter(transact_2011 < quantile(df_tran_2011$transact_2011, .75) + 1.5*stats::IQR(df_tran_2011$transact_2011),
+                                              transact_2011 > quantile(df_tran_2011$transact_2011, .25) - 1.5*stats::IQR(df_tran_2011$transact_2011))
+
+df_tran_2012 <- df_tran %>% filter(!is.na(transact_2012), 
+                                   rev_2012 != 0,
+                                   transact_2012 != 0)
+df_tran_2012_clean <- df_tran_2012 %>% filter(transact_2012 < quantile(df_tran_2012$transact_2012, .75) + 1.5*stats::IQR(df_tran_2012$transact_2012),
+                                              transact_2012 > quantile(df_tran_2012$transact_2012, .25) - 1.5*stats::IQR(df_tran_2012$transact_2012))
+
+
+grob1 = grobTree(textGrob(paste("Pearson Correlation : ", round(cor(df_tran_2010_clean$transact_2010, df_tran_2010_clean$rev_2010, use = 'pairwise.complete.obs'), 2) ), 
+                          x = 0.4, y = 0.8, hjust = 0, gp = gpar(col = "black", fontsize = 11, fontface = "bold")))
+
+grob2 = grobTree(textGrob(paste("Pearson Correlation : ", round(cor(df_tran_2011_clean$transact_2011, df_tran_2011_clean$rev_2011, use = 'pairwise.complete.obs'), 2) ), 
+                         x = 0.6, y = 0.8, hjust = 0, gp = gpar(col = "black", fontsize = 11, fontface = "bold")))
+
+grob3 = grobTree(textGrob(paste("Pearson Correlation : ", round(cor(df_tran_2012_clean$transact_2012, df_tran_2012_clean$rev_2012, use = 'pairwise.complete.obs'), 2) ), 
+                         x = 0.6, y = 0.8, hjust = 0, gp = gpar(col = "black", fontsize = 11, fontface = "bold")))
+
+
+g1 <- ggplot(df_tran_2010_clean, aes(transact_2010, rev_2010)) + geom_point() + ggtitle("2010 Revenue and Transactions") + geom_smooth(method=lm, se=FALSE) + annotation_custom(grob1) + theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(name = "Transactions", limits = c(0, 700000), breaks = seq(0, 700000, 200000)) + scale_y_continuous(name = "Revenue", limits = c(0,100000), breaks = seq(0, 100000, 25000))
+
+g2 <- ggplot(df_tran_2011_clean, aes(transact_2011, rev_2011)) + geom_point() + ggtitle("2011 Revenue and Transactions") + geom_smooth(method=lm, se=FALSE) + annotation_custom(grob1) + theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(name = "Transactions", limits = c(0, 700000), breaks = seq(0, 700000, 200000)) + scale_y_continuous(name = "Revenue", limits = c(0,100000), breaks = seq(0, 100000, 25000))
+
+g3 <- ggplot(df_tran_2012_clean, aes(transact_2012, rev_2012)) + geom_point() + ggtitle("2012 Revenue and Transactions") + geom_smooth(method=lm, se=FALSE) + annotation_custom(grob1) + theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_continuous(name = "Transactions", limits = c(0, 700000), breaks = seq(0, 700000, 200000)) + scale_y_continuous(name = "Revenue", limits = c(0,100000), breaks = seq(0, 100000, 25000))
+
+gridExtra::grid.arrange(g1, g2, g3, nrow = 1, ncol = 3)
+
+
+# Usage Based Model -------------------------------------------------------
+df_tran_2012_clean %>% mutate(trans_tier = ifelse(transact_2012 >= 600000, 4,
+                                                  ifelse(transact_2012 >= 400000, 3,
+                                                         ifelse(transact_2012 >= 200000, 2, 1)))) %>% group_by(trans_tier) %>% 
+                                  summarise(count=n(),
+                                            total_trans = sum(transact_2012),
+                                           total_rev = sum(rev_2012),
+                                           rev_per_trans = total_rev/total_trans)
